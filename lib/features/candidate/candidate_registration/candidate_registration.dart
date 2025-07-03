@@ -8,6 +8,9 @@ import 'package:gongcaedan_front/features/candidate/form/career_form.dart';
 import 'package:gongcaedan_front/features/candidate/form/criminal_record_form.dart';
 import 'package:gongcaedan_front/features/candidate/form/pledge_form.dart';
 import 'package:gongcaedan_front/features/candidate/form/video_form.dart';
+import 'package:gongcaedan_front/features/candidate/form/models/party_model.dart';
+import 'package:gongcaedan_front/features/candidate/form/models/candidate_post_request.dart';
+import 'package:gongcaedan_front/features/candidate/form/api/candidate_api.dart';
 
 enum RegistrationStep {
   basicInfo,
@@ -30,7 +33,12 @@ class _CandidateRegistrationPageState extends State<CandidateRegistrationPage> {
 
   File? _selectedImage;
   final ImagePicker _picker = ImagePicker();
-  String _selectedParty = "더불어민주당";
+
+  String _name = '';
+  String _birthDate = '';
+  String _gender = 'M';
+  int? _partyId;
+  String _selectedParty = "";
 
   int _educationCount = 1;
   List<Map<String, dynamic>> _educationList = [
@@ -58,7 +66,31 @@ class _CandidateRegistrationPageState extends State<CandidateRegistrationPage> {
     'date': '',
   };
 
-  void _goToNextStep() {
+  void _goToNextStep() async {
+    if (_currentStep == RegistrationStep.basicInfo) {
+      if (_name.isEmpty || _birthDate.isEmpty || _partyId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('이름, 생년월일, 정당을 입력해주세요.')),
+        );
+        return;
+      }
+
+      final request = CandidatePostRequest(
+        name: _name,
+        birthDate: _birthDate,
+        gender: _gender,
+        partyId: _partyId!,
+        profileImageUrl: "http://example.com/kim.jpg", // TODO: 업로드 URL
+      );
+
+      try {
+        await CandidateApi.submitCandidate(request);
+        print("✅ 후보자 등록 성공");
+      } catch (e) {
+        print("❌ 후보자 등록 실패: $e");
+      }
+    }
+
     setState(() {
       final nextIndex = _currentStep.index + 1;
       if (nextIndex < RegistrationStep.values.length) {
@@ -135,12 +167,17 @@ class _CandidateRegistrationPageState extends State<CandidateRegistrationPage> {
     switch (_currentStep) {
       case RegistrationStep.basicInfo:
         return BasicInfoForm(
-          selectedParty: _selectedParty,
-          onPartyChanged: (value) => setState(() => _selectedParty = value),
+          onPartyChanged: (party) {
+            setState(() {
+              _partyId = party?.id;
+              _selectedParty = party?.name ?? '';
+            });
+          },
           onPickImage: _pickImage,
           selectedImage: _selectedImage,
-          onNameChanged: (val) {},
-          onBirthChanged: (val) {},
+          onNameChanged: (val) => setState(() => _name = val),
+          onBirthChanged: (val) => setState(() => _birthDate = val),
+          onGenderChanged: (val) => setState(() => _gender = val),
         );
       case RegistrationStep.education:
         return _buildEducationStep();
@@ -160,16 +197,6 @@ class _CandidateRegistrationPageState extends State<CandidateRegistrationPage> {
           },
         );
     }
-  }
-
-  Widget _buildPlaceholder(String text) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      height: 200,
-      alignment: Alignment.center,
-      color: Colors.grey.shade200,
-      child: Text(text, style: const TextStyle(fontSize: 16)),
-    );
   }
 
   Widget _buildEducationStep() {
@@ -305,22 +332,6 @@ class _CandidateRegistrationPageState extends State<CandidateRegistrationPage> {
           );
         }),
       ],
-    );
-  }
-
-  Widget _buildLabeledTextField(String label, Function(String) onChanged) {
-    return TextField(
-      decoration: InputDecoration(
-        labelText: label,
-        filled: true,
-        fillColor: Colors.grey.shade100,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: Colors.grey.shade400),
-        ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      ),
-      onChanged: onChanged,
     );
   }
 }

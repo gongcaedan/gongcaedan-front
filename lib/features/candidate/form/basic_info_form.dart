@@ -1,32 +1,78 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'api/party_api.dart';
+import 'models/party_model.dart';
 
-class BasicInfoForm extends StatelessWidget {
-  final String selectedParty;
-  final Function(String) onPartyChanged;
+class BasicInfoForm extends StatefulWidget {
+  final Function(Party?) onPartyChanged;
   final VoidCallback onPickImage;
   final File? selectedImage;
-
   final Function(String) onNameChanged;
   final Function(String) onBirthChanged;
+  final Function(String) onGenderChanged;
 
   const BasicInfoForm({
     super.key,
-    required this.selectedParty,
     required this.onPartyChanged,
     required this.onPickImage,
     required this.selectedImage,
     required this.onNameChanged,
     required this.onBirthChanged,
+    required this.onGenderChanged,
   });
+
+  @override
+  State<BasicInfoForm> createState() => _BasicInfoFormState();
+}
+
+class _BasicInfoFormState extends State<BasicInfoForm> {
+  List<Party> _partyList = [];
+  Party? _selectedParty;
+  String _selectedGender = 'M';
+
+  final TextEditingController _birthController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadParties();
+  }
+
+  Future<void> _loadParties() async {
+    try {
+      final parties = await PartyApi.fetchParties();
+      setState(() {
+        _partyList = parties;
+        _selectedParty = parties.first;
+        widget.onPartyChanged(_selectedParty);
+      });
+    } catch (e) {
+      print("정당 불러오기 실패: $e");
+    }
+  }
+
+  Future<void> _pickBirthDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime(2000),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      final formatted = DateFormat('yyyy-MM-dd').format(picked);
+      _birthController.text = formatted;
+      widget.onBirthChanged(formatted);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _buildTextField("이름", onNameChanged),
+        _buildTextField("이름", widget.onNameChanged),
         const SizedBox(height: 16),
-        _buildTextField("생년월일", onBirthChanged),
+        _buildBirthDatePicker(),
         const SizedBox(height: 16),
         _buildPartyDropdown(),
         const SizedBox(height: 16),
@@ -53,6 +99,25 @@ class BasicInfoForm extends StatelessWidget {
     );
   }
 
+  Widget _buildBirthDatePicker() {
+    return TextField(
+      controller: _birthController,
+      readOnly: true,
+      onTap: _pickBirthDate,
+      decoration: InputDecoration(
+        labelText: '생년월일 (yyyy-MM-dd)',
+        suffixIcon: const Icon(Icons.calendar_today),
+        filled: true,
+        fillColor: Colors.grey.shade100,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey.shade400),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
+    );
+  }
+
   Widget _buildPartyDropdown() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -62,20 +127,21 @@ class BasicInfoForm extends StatelessWidget {
         border: Border.all(color: Colors.grey.shade400),
       ),
       child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: selectedParty,
+        child: DropdownButton<Party>(
+          value: _selectedParty,
           isExpanded: true,
           icon: const Icon(Icons.arrow_drop_down),
-          items: const [
-            DropdownMenuItem(value: "더불어민주당", child: Text("더불어민주당")),
-            DropdownMenuItem(value: "국민의힘", child: Text("국민의힘")),
-            DropdownMenuItem(value: "정의당", child: Text("정의당")),
-            DropdownMenuItem(value: "무소속", child: Text("무소속")),
-          ],
-          onChanged: (value) {
-            if (value != null) {
-              onPartyChanged(value);
-            }
+          items: _partyList.map((party) {
+            return DropdownMenuItem<Party>(
+              value: party,
+              child: Text(party.name),
+            );
+          }).toList(),
+          onChanged: (party) {
+            setState(() {
+              _selectedParty = party;
+              widget.onPartyChanged(party);
+            });
           },
         ),
       ),
@@ -94,9 +160,27 @@ class BasicInfoForm extends StatelessWidget {
         children: [
           const Text("성별", style: TextStyle(fontSize: 16)),
           const SizedBox(width: 16),
-          Container(width: 28, height: 28, color: Colors.blue),
-          const SizedBox(width: 12),
-          Container(width: 28, height: 28, color: Colors.red),
+          ChoiceChip(
+            label: const Text('남'),
+            selected: _selectedGender == 'M',
+            onSelected: (selected) {
+              if (selected) {
+                setState(() => _selectedGender = 'M');
+                widget.onGenderChanged('M');
+              }
+            },
+          ),
+          const SizedBox(width: 8),
+          ChoiceChip(
+            label: const Text('여'),
+            selected: _selectedGender == 'F',
+            onSelected: (selected) {
+              if (selected) {
+                setState(() => _selectedGender = 'F');
+                widget.onGenderChanged('F');
+              }
+            },
+          ),
         ],
       ),
     );
@@ -104,7 +188,7 @@ class BasicInfoForm extends StatelessWidget {
 
   Widget _buildImagePicker(BuildContext context) {
     return GestureDetector(
-      onTap: onPickImage,
+      onTap: widget.onPickImage,
       child: Container(
         height: 200,
         width: double.infinity,
@@ -113,11 +197,11 @@ class BasicInfoForm extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.grey.shade400),
         ),
-        child: selectedImage == null
+        child: widget.selectedImage == null
             ? const Center(child: Text("프로필 이미지 선택", style: TextStyle(color: Colors.black54)))
             : ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: Image.file(selectedImage!, fit: BoxFit.cover),
+                child: Image.file(widget.selectedImage!, fit: BoxFit.cover),
               ),
       ),
     );
