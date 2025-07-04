@@ -11,6 +11,17 @@ import 'package:gongcaedan_front/features/candidate/form/video_form.dart';
 import 'package:gongcaedan_front/features/candidate/form/models/party_model.dart';
 import 'package:gongcaedan_front/features/candidate/form/models/candidate_post_request.dart';
 import 'package:gongcaedan_front/features/candidate/form/api/candidate_api.dart';
+import 'package:gongcaedan_front/features/candidate/form/models/education_post_request.dart';
+import 'package:gongcaedan_front/features/candidate/form/api/education_api.dart';
+import 'package:gongcaedan_front/features/candidate/form/models/career_post_request.dart';
+import 'package:gongcaedan_front/features/candidate/form/api/career_api.dart';
+import 'package:gongcaedan_front/features/candidate/form/api/criminal_record_api.dart';
+import 'package:gongcaedan_front/features/candidate/form/models/criminal_record_post_request.dart';
+import 'package:gongcaedan_front/features/candidate/form/models/pledge_post_request.dart';
+import 'package:gongcaedan_front/features/candidate/form/api/pledge_api.dart';
+import 'package:gongcaedan_front/features/candidate/form/models/video_post_request.dart';
+import 'package:gongcaedan_front/features/candidate/form/api/video_api.dart';
+import 'package:gongcaedan_front/features/candidate/candidate_page.dart';
 
 enum RegistrationStep {
   basicInfo,
@@ -38,6 +49,7 @@ class _CandidateRegistrationPageState extends State<CandidateRegistrationPage> {
   String _birthDate = '';
   String _gender = 'M';
   int? _partyId;
+  int? _candidateId; // ← 여기에 저장
   String _selectedParty = "";
 
   int _educationCount = 1;
@@ -62,9 +74,10 @@ class _CandidateRegistrationPageState extends State<CandidateRegistrationPage> {
 
   Map<String, dynamic> _videoData = {
     'title': '',
-    'url': '',
-    'date': '',
+    'videoUrl': '',         // ✅ 정확한 key
+    'broadcastDate': '',    // ✅ 정확한 key
   };
+
 
   void _goToNextStep() async {
     if (_currentStep == RegistrationStep.basicInfo) {
@@ -84,21 +97,171 @@ class _CandidateRegistrationPageState extends State<CandidateRegistrationPage> {
       );
 
       try {
-        await CandidateApi.submitCandidate(request);
-        print("✅ 후보자 등록 성공");
+        final id = await CandidateApi.submitCandidate(request);
+        setState(() {
+          _candidateId = id; // ✅ 저장됨
+          // ✅ 다음 단계로 이동
+          _currentStep = RegistrationStep.education;
+        });
+        print("✅ 후보자 등록 성공 - ID: $_candidateId");
       } catch (e) {
         print("❌ 후보자 등록 실패: $e");
+        return; // 실패 시 다음 단계로 안 넘어감
       }
     }
 
-    setState(() {
-      final nextIndex = _currentStep.index + 1;
-      if (nextIndex < RegistrationStep.values.length) {
-        _currentStep = RegistrationStep.values[nextIndex];
-      } else {
-        print("✅ 모든 입력 완료");
+    // ✅ 학력 등록 단계 추가
+    else if (_currentStep == RegistrationStep.education) {
+      if (_candidateId == null) {
+        print("❌ 후보자 ID 없음");
+        return;
       }
-    });
+
+      try {
+        final educationRequests = _educationList.map((edu) {
+          return EducationPostRequest(
+            schoolName: edu['school'],
+            major: edu['major'],
+            degree: edu['degree'],
+            graduationYear: int.tryParse(edu['gradYear'] ?? '0') ?? 0,
+          );
+        }).toList();
+
+        await EducationApi.submitEducation(
+          candidateId: _candidateId!,
+          educations: educationRequests,
+        );
+
+        print("✅ 학력 등록 완료");
+        setState(() {
+          _currentStep = RegistrationStep.career;
+        });
+      } catch (e) {
+        print("❌ 학력 등록 실패: $e");
+        return;
+      }
+    }
+
+    else if (_currentStep == RegistrationStep.career) {
+      if (_candidateId == null) {
+        print("❌ 후보자 ID 없음");
+        return;
+      }
+
+      try {
+        final careerRequests = _careerList.map((career) {
+          return CareerPostRequest(
+            position: career['position'],
+            organization: career['organization'],
+            startDate: career['startDate'],
+            endDate: career['endDate'],
+          );
+        }).toList();
+
+        await CareerApi.submitCareer(
+          candidateId: _candidateId!,
+          careers: careerRequests,
+        );
+
+        print("✅ 경력 등록 완료");
+        setState(() {
+          _currentStep = RegistrationStep.criminal;
+        });
+      } catch (e) {
+        print("❌ 경력 등록 실패: $e");
+        return;
+      }
+    }
+
+    else if (_currentStep == RegistrationStep.criminal) {
+      if (_candidateId == null) {
+        print("❌ 후보자 ID 없음");
+        return;
+      }
+
+      try {
+        final records = _criminalList.map((record) {
+          return CriminalRecordPostRequest(
+            caseDetail: record['caseDetail'],
+            sentence: record['sentence'],
+            judgmentDate: record['judgmentDate'],
+          );
+        }).toList();
+
+        await CriminalRecordApi.submitCriminalRecords(
+          candidateId: _candidateId!,
+          records: records,
+        );
+
+        print("✅ 전과기록 등록 완료");
+        setState(() {
+          _currentStep = RegistrationStep.pledge;
+        });
+      } catch (e) {
+        print("❌ 전과기록 등록 실패: $e");
+        return;
+      }
+    }
+
+    else if (_currentStep == RegistrationStep.pledge) {
+      if (_candidateId == null) {
+        print("❌ 후보자 ID 없음");
+        return;
+      }
+
+      try {
+        final pledgeRequests = _pledgeList.map((item) {
+          return PledgePostRequest(
+            title: item['title'],
+            description: item['content'],
+            category: item['category'],
+          );
+        }).toList();
+
+        await PledgeApi.submitPledges(
+          candidateId: _candidateId!,
+          pledges: pledgeRequests,
+        );
+
+        print("✅ 공약 등록 완료");
+        setState(() {
+          _currentStep = RegistrationStep.videoLink;
+        });
+      } catch (e) {
+        print("❌ 공약 등록 실패: $e");
+        return;
+      }
+    }
+
+    else if (_currentStep == RegistrationStep.videoLink) {
+      if (_candidateId == null) {
+        print("❌ 후보자 ID 없음");
+        return;
+      }
+
+      try {
+        final video = VideoPostRequest(
+          title: _videoData['title'],
+          videoUrl: _videoData['videoUrl'],
+          broadcastDate: _videoData['broadcastDate'],
+        );
+
+        await VideoApi.submitVideo(
+          candidateId: _candidateId!,
+          video: video,
+        );
+
+        print("✅ 영상 등록 완료");
+
+        // 마지막 단계이므로 등록 완료 후 페이지 종료
+        Navigator.pop(context, true);
+        return; // return 추가로 아래 setState 방지
+      } catch (e) {
+        print("❌ 영상 등록 실패: $e");
+        return;
+      }
+    }
+
   }
 
   Future<void> _pickImage() async {
