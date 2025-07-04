@@ -26,6 +26,7 @@ class Party {
 class Candidate {
   final int id;
   final String name;
+  final String? birthDate;
   final String profileImageUrl;
   final Party? party;
 
@@ -33,6 +34,7 @@ class Candidate {
     required this.id,
     required this.name,
     required this.profileImageUrl,
+    this.birthDate, // ❗ 이게 빠져 있었음!
     this.party,
   });
 
@@ -41,6 +43,7 @@ class Candidate {
       id: json['id'],
       name: json['name'],
       profileImageUrl: json['profileImageUrl'] ?? '',
+      birthDate: json['birthDate'], // ✅ 이 줄 추가
       party: json['party'] != null ? Party.fromJson(json['party']) : null,
     );
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 class EducationForm extends StatelessWidget {
   final int index;
@@ -25,7 +26,16 @@ class EducationForm extends StatelessWidget {
         const SizedBox(height: 8),
         _buildDegreeDropdown(),
         const SizedBox(height: 8),
-        _buildLabeledTextField("졸업연도", (val) => onChanged('gradYear', val)),
+        DateInputField(
+          label: "졸업일",
+          initialValue: data['gradYear'],
+          onDateSelected: (val) {
+            final yearOnly = DateTime.tryParse(val)?.year;
+            if (yearOnly != null) {
+              onChanged('gradYear', yearOnly.toString()); // 여전히 string으로 넘기되 값 보장
+            }
+          },
+        ),
         const SizedBox(height: 24),
       ],
     );
@@ -71,6 +81,66 @@ class EducationForm extends StatelessWidget {
             }
           },
         ),
+      ),
+    );
+  }
+}
+
+class DateInputField extends StatefulWidget {
+  final String label;
+  final String? initialValue;
+  final Function(String) onDateSelected;
+
+  const DateInputField({
+    super.key,
+    required this.label,
+    this.initialValue,
+    required this.onDateSelected,
+  });
+
+  @override
+  State<DateInputField> createState() => _DateInputFieldState();
+}
+
+class _DateInputFieldState extends State<DateInputField> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialValue ?? '');
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.tryParse(widget.initialValue ?? '') ?? DateTime.now(),
+      firstDate: DateTime(1950),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      final formatted = DateFormat('yyyy-MM-dd').format(picked);
+      _controller.text = formatted;
+      widget.onDateSelected(formatted);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      readOnly: true,
+      controller: _controller,
+      onTap: _pickDate,
+      decoration: InputDecoration(
+        labelText: widget.label,
+        suffixIcon: const Icon(Icons.calendar_today),
+        filled: true,
+        fillColor: Colors.grey.shade100,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey.shade400),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
     );
   }
